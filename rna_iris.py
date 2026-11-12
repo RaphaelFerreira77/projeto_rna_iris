@@ -51,22 +51,60 @@ def carregar_e_preparar_dados(seed=SEED):
 
 
 # -----------------------------------------------------------------------------
-# TESTE DA ETAPA 1 (será removido/reorganizado nas próximas etapas)
+# SEÇÃO 3: INICIALIZAÇÃO DOS PARÂMETROS DA REDE (ARQUITETURA 4-8-3)
+# -----------------------------------------------------------------------------
+
+def inicializar_parametros(n_entrada=4, n_escondida=8, n_saida=3, seed=SEED):
+    """
+    Cria os pesos (W1, W2) e os vieses (b1, b2) com valores aleatórios.
+
+    Formas (shapes):
+        W1: (n_entrada, n_escondida)  -> (4, 8)
+        b1: (1, n_escondida)          -> (1, 8)
+        W2: (n_escondida, n_saida)    -> (8, 3)
+        b2: (1, n_saida)              -> (1, 3)
+    """
+    rng = np.random.default_rng(seed)
+
+    # Pesos: números aleatórios de uma normal (média 0, desvio 1),
+    # multiplicados por sqrt(2 / n_entradas_da_camada) (inicialização "He").
+    W1 = rng.standard_normal((n_entrada, n_escondida)) * np.sqrt(2.0 / n_entrada)
+    W2 = rng.standard_normal((n_escondida, n_saida)) * np.sqrt(2.0 / n_escondida)
+
+    # Vieses: valores aleatórios bem pequenos
+    b1 = rng.standard_normal((1, n_escondida)) * 0.01
+    b2 = rng.standard_normal((1, n_saida)) * 0.01
+
+    return {"W1": W1, "b1": b1, "W2": W2, "b2": b2}
+
+
+# -----------------------------------------------------------------------------
+# TESTE DA ETAPA 2 (será reorganizado nas próximas etapas)
+# O bloco abaixo precisa ficar SEMPRE no final do arquivo.
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
     X_treino, X_teste, y_treino, y_teste, y_teste_rotulos = carregar_e_preparar_dados()
-
     print("Shape X_treino:", X_treino.shape)
-    print("Shape X_teste :", X_teste.shape)
     print("Shape y_treino (one-hot):", y_treino.shape)
-    print("Shape y_teste  (one-hot):", y_teste.shape)
 
-    print("\nMédia das características no treino (esperado ~0):")
-    print(np.round(X_treino.mean(axis=0), 4))
-    print("Desvio das características no treino (esperado ~1):")
-    print(np.round(X_treino.std(axis=0), 4))
+    parametros = inicializar_parametros()
 
-    print("\nPrimeiras 3 amostras de treino (padronizadas):")
-    print(np.round(X_treino[:3], 3))
-    print("Seus rótulos one-hot:")
-    print(y_treino[:3])
+    print("\n--- Parâmetros da rede 4-8-3 ---")
+    for nome, valor in parametros.items():
+        print(f"{nome}: shape = {valor.shape}")
+
+    total = sum(valor.size for valor in parametros.values())
+    print("\nTotal de parâmetros treináveis:", total)
+
+    print("\nW1 (4x8), arredondado:")
+    print(np.round(parametros["W1"], 3))
+    print("\nb1 (1x8), arredondado:")
+    print(np.round(parametros["b1"], 3))
+    print("\nW2 (8x3), arredondado:")
+    print(np.round(parametros["W2"], 3))
+    print("\nb2 (1x3), arredondado:")
+    print(np.round(parametros["b2"], 3))
+
+    p2 = inicializar_parametros()
+    print("\nReprodutível com a mesma semente?",
+          all(np.array_equal(parametros[k], p2[k]) for k in parametros))
