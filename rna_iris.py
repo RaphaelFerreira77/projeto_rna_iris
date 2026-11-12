@@ -132,36 +132,95 @@ def entropia_cruzada(Y, A2, eps=1e-12):
     return np.mean(perda_por_amostra)
 
 # -----------------------------------------------------------------------------
-# TESTE DA ETAPA 3 - PARTE A (Forward Pass e Cross-Entropy)
+# SEÇÃO 5: BACKPROPAGATION E GRADIENTE DESCENDENTE
+# -----------------------------------------------------------------------------
+
+def backward(X, Y, parametros, cache):
+    """
+    Backpropagation: calcula o gradiente da perda em relação a W1, b1, W2, b2
+    usando a regra da cadeia, da saída para a entrada.
+
+    X: (n, 4)   Y: (n, 3) one-hot
+    Retorna um dicionário com dW1, db1, dW2, db2 (mesmos shapes dos parâmetros).
+    """
+    n = X.shape[0]
+    W2 = parametros["W2"]
+    A1, Z1, A2 = cache["A1"], cache["Z1"], cache["A2"]
+
+    # --- Camada de saída ---
+    # Softmax + Cross-Entropy juntas resultam em uma fórmula simples:
+    # dL/dZ2 = (A2 - Y) / n
+    dZ2 = (A2 - Y) / n                           # (n, 3)
+    dW2 = A1.T @ dZ2                             # (8, n) @ (n, 3) -> (8, 3)
+    db2 = np.sum(dZ2, axis=0, keepdims=True)     # (1, 3)
+
+    # --- Camada escondida ---
+    dA1 = dZ2 @ W2.T                             # (n, 3) @ (3, 8) -> (n, 8)
+    dZ1 = dA1 * (Z1 > 0)                         # derivada da ReLU: 1 se Z1>0, senão 0
+    dW1 = X.T @ dZ1                              # (4, n) @ (n, 8) -> (4, 8)
+    db1 = np.sum(dZ1, axis=0, keepdims=True)     # (1, 8)
+
+    return {"dW1": dW1, "db1": db1, "dW2": dW2, "db2": db2}
+
+
+def atualizar_parametros(parametros, gradientes, taxa_aprendizado):
+    """
+    Gradiente Descendente: dá um passo contra o gradiente.
+        parametro = parametro - taxa_aprendizado * gradiente
+    """
+    parametros["W1"] -= taxa_aprendizado * gradientes["dW1"]
+    parametros["b1"] -= taxa_aprendizado * gradientes["db1"]
+    parametros["W2"] -= taxa_aprendizado * gradientes["dW2"]
+    parametros["b2"] -= taxa_aprendizado * gradientes["db2"]
+    return parametros
+
+# -----------------------------------------------------------------------------
+# TESTE DA ETAPA 3 - PARTE B (Backpropagation e Gradiente Descendente)
 # O bloco abaixo precisa ficar SEMPRE no final do arquivo.
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
     X_treino, X_teste, y_treino, y_teste, y_teste_rotulos = carregar_e_preparar_dados()
     parametros = inicializar_parametros()
 
-    # --- Teste da Softmax com o exemplo numérico da explicação ---
-    z_exemplo = np.array([[2.0, 1.0, 0.1]])
-    print("Softmax([2.0, 1.0, 0.1]) =", np.round(softmax(z_exemplo), 3))
-
-    # --- Teste da Cross-Entropy com os exemplos da explicação ---
-    y_exemplo = np.array([[0.0, 1.0, 0.0]])
-    p_bom = np.array([[0.2, 0.7, 0.1]])
-    p_ruim = np.array([[0.7, 0.2, 0.1]])
-    print("Perda (previsão boa) :", round(entropia_cruzada(y_exemplo, p_bom), 4))
-    print("Perda (previsão ruim):", round(entropia_cruzada(y_exemplo, p_ruim), 4))
-
-    # --- Forward Pass nos dados de treino (rede ainda NÃO treinada) ---
+    # --- 1) Forward + Backward uma vez ---
     A2, cache = forward(X_treino, parametros)
-    print("\nShape de Z1:", cache["Z1"].shape)
-    print("Shape de A1:", cache["A1"].shape)
-    print("Shape de Z2:", cache["Z2"].shape)
-    print("Shape de A2:", A2.shape)
+    gradientes = backward(X_treino, y_treino, parametros, cache)
 
-    print("\nPrimeiras 3 previsões (probabilidades):")
-    print(np.round(A2[:3], 3))
-    print("Soma de cada linha (esperado 1):", np.round(A2[:3].sum(axis=1), 6))
-    print("Todas as somas == 1?", np.allclose(A2.sum(axis=1), 1.0))
+    print("Shapes dos gradientes (devem ser iguais aos dos parâmetros):")
+    for nome in ["W1", "b1", "W2", "b2"]:
+        print(f"  d{nome}: {gradientes['d' + nome].shape}  |  {nome}: {parametros[nome].shape}")
 
-    perda_inicial = entropia_cruzada(y_treino, A2)
-    print("\nPerda inicial (rede sem treino):", round(perda_inicial, 4))
-    print("Referência, chute uniforme: ln(3) =", round(np.log(3), 4))
+    # --- 2) Verificação numérica do gradiente (gradient check) ---
+    # Compara o gradiente do Backpropagation com uma estimativa por diferença
+    # finita: (L(w + h) - L(w - h)) / (2h). Se baterem, o backprop está certo.
+    def perda_com(parametros_):
+        A2_, _ = forward(X_treino, parametros_)
+        return entropia_cruzada(y_treino, A2_)
+
+    h = 1e-5
+    maior_diferenca = 0.0
+    for nome in ["W1", "b1", "W2", "b2"]:
+        analitico = gradientes["d" + nome]
+        numerico = np.zeros_like(analitico)
+        for idx in np.ndindex(parametros[nome].shape):
+            original = parametros[nome][idx]
+            parametros[nome][idx] = original + h
+            perda_mais = perda_com(parametros)
+            parametros[nome][idx] = original - h
+            perda_menos = perda_com(parametros)
+            parametros[nome][idx] = original          # restaura o valor
+            numerico[idx] = (perda_mais - perda_menos) / (2 * h)
+        diferenca = np.max(np.abs(analitico - numerico))
+        maior_diferenca = max(maior_diferenca, diferenca)
+        print(f"Gradient check {nome}: maior diferença = {diferenca:.2e}")
+
+    print("Backpropagation correto?", maior_diferenca < 1e-7)
+
+    # --- 3) Poucos passos de Gradiente Descendente ---
+    print("\nPerda a cada passo (taxa de aprendizado = 0.1):")
+    for passo in range(6):
+        A2, cache = forward(X_treino, parametros)
+        perda = entropia_cruzada(y_treino, A2)
+        print(f"  passo {passo}: perda = {perda:.4f}")
+        gradientes = backward(X_treino, y_treino, parametros, cache)
+        parametros = atualizar_parametros(parametros, gradientes, 0.1)
