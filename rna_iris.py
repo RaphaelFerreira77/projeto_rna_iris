@@ -175,52 +175,75 @@ def atualizar_parametros(parametros, gradientes, taxa_aprendizado):
     return parametros
 
 # -----------------------------------------------------------------------------
-# TESTE DA ETAPA 3 - PARTE B (Backpropagation e Gradiente Descendente)
+# SEÇÃO 6: LOOP DE TREINAMENTO E GRÁFICO DA PERDA
+# -----------------------------------------------------------------------------
+
+def treinar(X, Y, parametros, epocas=1000, taxa_aprendizado=0.1, intervalo_log=100):
+    """
+    Treina a rede com Gradiente Descendente.
+    Cada época = 1 passada completa pelos dados de treino:
+        forward -> perda -> backward -> atualização dos parâmetros.
+
+    Retorna os parâmetros treinados e a lista com a perda de cada época.
+    """
+    historico_perda = []
+
+    for epoca in range(1, epocas + 1):
+        # 1) Forward Pass
+        A2, cache = forward(X, parametros)
+
+        # 2) Perda (Cross-Entropy)
+        perda = entropia_cruzada(Y, A2)
+        historico_perda.append(perda)
+
+        # 3) Backpropagation
+        gradientes = backward(X, Y, parametros, cache)
+
+        # 4) Atualização dos parâmetros (Gradiente Descendente)
+        parametros = atualizar_parametros(parametros, gradientes, taxa_aprendizado)
+
+        # Acompanhamento no console
+        if epoca == 1 or epoca % intervalo_log == 0:
+            print(f"Época {epoca:4d}/{epocas} | perda = {perda:.4f}")
+
+    return parametros, historico_perda
+
+
+def plotar_perda(historico_perda, caminho_arquivo="perda.png"):
+    """Gera o gráfico da perda por época, salva em arquivo e exibe na tela."""
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(range(1, len(historico_perda) + 1), historico_perda, color="tab:blue")
+    plt.title("Evolução da Cross-Entropy Loss durante o treinamento")
+    plt.xlabel("Época")
+    plt.ylabel("Perda (Cross-Entropy)")
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(caminho_arquivo, dpi=150)
+    plt.show()
+
+# -----------------------------------------------------------------------------
+# EXECUÇÃO: TREINAMENTO (ETAPA 3 - PARTE C)
 # O bloco abaixo precisa ficar SEMPRE no final do arquivo.
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
+    EPOCAS = 1000
+    TAXA_APRENDIZADO = 0.1
+
+    # Dados: o conjunto de teste NÃO é usado no treinamento
     X_treino, X_teste, y_treino, y_teste, y_teste_rotulos = carregar_e_preparar_dados()
+
+    # Parâmetros iniciais aleatórios
     parametros = inicializar_parametros()
 
-    # --- 1) Forward + Backward uma vez ---
-    A2, cache = forward(X_treino, parametros)
-    gradientes = backward(X_treino, y_treino, parametros, cache)
+    # Treinamento só com os dados de treino
+    parametros, historico_perda = treinar(
+        X_treino, y_treino, parametros,
+        epocas=EPOCAS, taxa_aprendizado=TAXA_APRENDIZADO
+    )
 
-    print("Shapes dos gradientes (devem ser iguais aos dos parâmetros):")
-    for nome in ["W1", "b1", "W2", "b2"]:
-        print(f"  d{nome}: {gradientes['d' + nome].shape}  |  {nome}: {parametros[nome].shape}")
+    print("\nPerda inicial:", round(historico_perda[0], 4))
+    print("Perda final  :", round(historico_perda[-1], 4))
 
-    # --- 2) Verificação numérica do gradiente (gradient check) ---
-    # Compara o gradiente do Backpropagation com uma estimativa por diferença
-    # finita: (L(w + h) - L(w - h)) / (2h). Se baterem, o backprop está certo.
-    def perda_com(parametros_):
-        A2_, _ = forward(X_treino, parametros_)
-        return entropia_cruzada(y_treino, A2_)
-
-    h = 1e-5
-    maior_diferenca = 0.0
-    for nome in ["W1", "b1", "W2", "b2"]:
-        analitico = gradientes["d" + nome]
-        numerico = np.zeros_like(analitico)
-        for idx in np.ndindex(parametros[nome].shape):
-            original = parametros[nome][idx]
-            parametros[nome][idx] = original + h
-            perda_mais = perda_com(parametros)
-            parametros[nome][idx] = original - h
-            perda_menos = perda_com(parametros)
-            parametros[nome][idx] = original          # restaura o valor
-            numerico[idx] = (perda_mais - perda_menos) / (2 * h)
-        diferenca = np.max(np.abs(analitico - numerico))
-        maior_diferenca = max(maior_diferenca, diferenca)
-        print(f"Gradient check {nome}: maior diferença = {diferenca:.2e}")
-
-    print("Backpropagation correto?", maior_diferenca < 1e-7)
-
-    # --- 3) Poucos passos de Gradiente Descendente ---
-    print("\nPerda a cada passo (taxa de aprendizado = 0.1):")
-    for passo in range(6):
-        A2, cache = forward(X_treino, parametros)
-        perda = entropia_cruzada(y_treino, A2)
-        print(f"  passo {passo}: perda = {perda:.4f}")
-        gradientes = backward(X_treino, y_treino, parametros, cache)
-        parametros = atualizar_parametros(parametros, gradientes, 0.1)
+    plotar_perda(historico_perda)
