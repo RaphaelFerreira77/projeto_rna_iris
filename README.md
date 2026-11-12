@@ -17,6 +17,6 @@ python rna_iris.py
 ## Status
 
 - [x] Etapa 1 - Pré-processamento
-- [ ] Etapa 2 - Arquitetura e inicialização
+- [x] Etapa 2 - Arquitetura e inicialização
 - [ ] Etapa 3 - Treinamento
 - [ ] Etapa 4 - Avaliação
