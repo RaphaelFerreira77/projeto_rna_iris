@@ -77,6 +77,7 @@ def inicializar_parametros(n_entrada=4, n_escondida=8, n_saida=3, seed=SEED):
 
     return {"W1": W1, "b1": b1, "W2": W2, "b2": b2}
 
+
 # -----------------------------------------------------------------------------
 # SEÇÃO 4: FUNÇÕES DE ATIVAÇÃO, FORWARD PASS E FUNÇÃO DE PERDA
 # -----------------------------------------------------------------------------
@@ -131,6 +132,7 @@ def entropia_cruzada(Y, A2, eps=1e-12):
     perda_por_amostra = -np.sum(Y * np.log(A2), axis=1)   # (n,)
     return np.mean(perda_por_amostra)
 
+
 # -----------------------------------------------------------------------------
 # SEÇÃO 5: BACKPROPAGATION E GRADIENTE DESCENDENTE
 # -----------------------------------------------------------------------------
@@ -173,6 +175,7 @@ def atualizar_parametros(parametros, gradientes, taxa_aprendizado):
     parametros["W2"] -= taxa_aprendizado * gradientes["dW2"]
     parametros["b2"] -= taxa_aprendizado * gradientes["db2"]
     return parametros
+
 
 # -----------------------------------------------------------------------------
 # SEÇÃO 6: LOOP DE TREINAMENTO E GRÁFICO DA PERDA
@@ -223,13 +226,41 @@ def plotar_perda(historico_perda, caminho_arquivo="perda.png"):
     plt.savefig(caminho_arquivo, dpi=150)
     plt.show()
 
+
 # -----------------------------------------------------------------------------
-# EXECUÇÃO: TREINAMENTO (ETAPA 3 - PARTE C)
+# SEÇÃO 7: INFERÊNCIA E AVALIAÇÃO (ACURÁCIA)
+# -----------------------------------------------------------------------------
+
+def prever(X, parametros):
+    """
+    Inferência: roda o Forward Pass e devolve a classe prevista (0, 1 ou 2),
+    que é a de maior probabilidade em cada linha de A2.
+    """
+    A2, _ = forward(X, parametros)
+    return np.argmax(A2, axis=1)
+
+
+def calcular_acuracia(y_real, y_previsto):
+    """Acurácia = (número de acertos) / (número total de amostras)."""
+    return np.mean(y_real == y_previsto)
+
+
+def matriz_confusao(y_real, y_previsto, num_classes=3):
+    """Matriz (3x3): linha = classe real, coluna = classe prevista."""
+    matriz = np.zeros((num_classes, num_classes), dtype=int)
+    for real, previsto in zip(y_real, y_previsto):
+        matriz[real, previsto] += 1
+    return matriz
+
+
+# -----------------------------------------------------------------------------
+# EXECUÇÃO: TREINAMENTO E AVALIAÇÃO (ETAPAS 3 E 4)
 # O bloco abaixo precisa ficar SEMPRE no final do arquivo.
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
     EPOCAS = 1000
     TAXA_APRENDIZADO = 0.1
+    NOMES_CLASSES = ["setosa", "versicolor", "virginica"]
 
     # Dados: o conjunto de teste NÃO é usado no treinamento
     X_treino, X_teste, y_treino, y_teste, y_teste_rotulos = carregar_e_preparar_dados()
@@ -245,5 +276,33 @@ if __name__ == "__main__":
 
     print("\nPerda inicial:", round(historico_perda[0], 4))
     print("Perda final  :", round(historico_perda[-1], 4))
+
+    # ---------------- ETAPA 4: AVALIAÇÃO ----------------
+    # Rótulos reais do treino (de one-hot de volta para 0, 1, 2)
+    y_treino_rotulos = np.argmax(y_treino, axis=1)
+
+    previsto_treino = prever(X_treino, parametros)
+    previsto_teste = prever(X_teste, parametros)
+
+    acuracia_treino = calcular_acuracia(y_treino_rotulos, previsto_treino)
+    acuracia_teste = calcular_acuracia(y_teste_rotulos, previsto_teste)
+
+    print("\n--- Comparação: classe real x classe prevista (teste) ---")
+    print("Real        | Previsto    | Acertou?")
+    for real, previsto in zip(y_teste_rotulos, previsto_teste):
+        marca = "sim" if real == previsto else "NÃO"
+        print(f"{NOMES_CLASSES[real]:<11} | {NOMES_CLASSES[previsto]:<11} | {marca}")
+
+    acertos = int(np.sum(y_teste_rotulos == previsto_teste))
+    print(f"\nAcertos no teste: {acertos} de {len(y_teste_rotulos)}")
+
+    print("\nMatriz de confusão (linha = real, coluna = previsto):")
+    print("              ", "  ".join(f"{n[:6]:>6}" for n in NOMES_CLASSES))
+    matriz = matriz_confusao(y_teste_rotulos, previsto_teste)
+    for i, nome in enumerate(NOMES_CLASSES):
+        print(f"{nome:<14}", "  ".join(f"{v:>6}" for v in matriz[i]))
+
+    print(f"\nAcurácia no treino: {acuracia_treino * 100:.2f}%")
+    print(f"Acurácia no teste : {acuracia_teste * 100:.2f}%")
 
     plotar_perda(historico_perda)
